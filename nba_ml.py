@@ -7,15 +7,15 @@ import seaborn as sns # tSNE visualization
 from sklearn.decomposition import FastICA
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA, KernelPCA
-# K-means
+# Clustering
 from sklearn.cluster import KMeans
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
+from sklearn.cluster import SpectralClustering
+from sklearn.metrics import silhouette_samples, silhouette_score
 
-#######################
+############
 # CLEANING #
-#######################
+############
+
 def filter_years(df):
     # Filter data so only seasons from 2010 onwards are included
     df = df[df['Year'].notna()]
@@ -49,7 +49,6 @@ df = fill_empty_values(df)
 # Taking only first position listed when multiple are listed
 df['Pos'] = df['Pos'].str.split('-').str[0]
 
-
 #######
 # PCA #
 #######
@@ -69,7 +68,7 @@ def plot_PCA(df, year):
     principalDf = pd.DataFrame(data = principalComponents, columns = ['pc1', 'pc2'])
     final = pd.concat([principalDf.reset_index(drop=True), df_vis['Pos'].reset_index(drop=True)], axis=1)
     print("Explained variance: ", pca.explained_variance_ratio_)
-    fig = plt.figure(figsize = (8,8))
+    fig = plt.figure(1, figsize = (8,8))
     ax = fig.add_subplot(1,1,1) 
     ax.set_xlabel('Principal Component 1', fontsize = 15)
     ax.set_ylabel('Principal Component 2', fontsize = 15)
@@ -94,6 +93,7 @@ def plot_featImport_PCA(pcaObj, features):
     top_fimp1 = fimp1.nlargest(10,'imp')
     top_fimp1 = top_fimp1.iloc[::-1]
     top_fimp1 = top_fimp1.set_index("feat")
+    # plt.figure(2)
     ax = top_fimp1.plot.barh()
     ax.set_xlabel('Importance', fontsize = 15)
     ax.set_ylabel('Feature', fontsize = 15)
@@ -123,7 +123,6 @@ def feature_variance (df, year, percent):
     print("{}% of features explained by {} features".format(perExplained, principalComponents.shape[1]))
     return principalComponents.shape[1] # num of features
 
-
 df_PCA, pca, features = plot_PCA(df, 2010)
 plot_featImport_PCA(pca, features)
 feature_variance(df, 2010, 0.99)
@@ -132,56 +131,74 @@ feature_variance(df, 2010, 0.99)
 ######################
 # K-Means Clustering #
 ######################
-# Note: You may need to re-run the second block of code (reading the .csv) AND the data cleaning block before running everything after this point.
 
-year = 2010
-print(df.columns)
 
-season_data = df[df['Year'] == year]
-season_data = season_data.drop('Year', axis=1)
-season_data.mean()
-season_data.loc[:,"FG"].mean()
+#######################
+# Spectral Clustering #
+#######################
 
-# Create a pairplot and a heatmap in order to see correlations between different columns
-correlation = season_data[["AST", "FG", "TRB"]].corr()
-sns.pairplot(season_data[["AST", "FG", "TRB"]])
-sns.heatmap(correlation, annot=True)
+def season_data(df, year):
+    season_data = df[df['Year'] == year]
+    season_data = season_data.drop('Year', axis=1)
+    return season_data
 
-# Use the K-Means Clustering Method to see which players are the most similar
-model = KMeans(n_clusters=6, random_state=1)
-columns_with_data = season_data._get_numeric_data().dropna(axis=1)
-model.fit(columns_with_data)
-data_labels = model.labels_
+def season_numeric_data(season_df):
+    return season_df._get_numeric_data().dropna(axis=1)
 
-nba_pca = PCA(2)
-plot_columns = nba_pca.fit_transform(columns_with_data)
-fig = plt.figure(figsize = (8,8))
-ax = fig.add_subplot(1,1,1) 
-ax.scatter(x=plot_columns[:,0], y=plot_columns[:,1], c=data_labels)
+def generate_spec_model(k):
+    spec = SpectralClustering(n_clusters=k, affinity='nearest_neighbors',assign_labels='kmeans')
+    return spec
 
-# How to see which cluster a specific player belongs to
-player_one = columns_with_data.loc[season_data['Player'] == 'Stephen Curry',:]
-player_two = columns_with_data.loc[season_data['Player'] == 'Kyle Lowry',:]
+def __get_PCA_with_clusters(season_numeric):
+    nba_pca = PCA(2) #put data into 2 dimensions
+    return nba_pca.fit_transform(season_numeric)
 
-player_one_list = player_one.values.tolist()
-player_two_list = player_two.values.tolist()
+def get_labels(model, season_numeric):
+    labels = model.fit_predict(season_numeric)
+    return labels
 
-player_one_label = model.predict(player_one_list)
-player_two_label = model.predict(player_two_list)
+def plot_Silh_Score(season_numeric, min_cluster, max_cluster):
+    silhouette_scores = []
+    for i in range(min_cluster, max_cluster):
+        model = generate_spec_model(i)
+        labels = get_labels(model, season_numeric)
+        silhouette_avg = silhouette_score(season_numeric, labels)
+        silhouette_scores.append(silhouette_avg)
+        # print("For n_clusters =", i, "The average silhouette_score is:", silhouette_avg)
+    n_clusters = list(range(min_cluster, max_cluster))
+    plt.figure(4)
+    plt.plot(n_clusters, silhouette_scores, '-o')
+    plt.grid()
+    plt.xlabel('Number of Clusters', fontsize=15)
+    plt.xticks(fontsize=12)
+    plt.ylabel('Score', fontsize=15)
+    plt.yticks(fontsize=12)
+    plt.title('Spectral Clustering Silhouette Scores ', fontsize=16)
 
-print(player_one_label)
-print(player_two_label)
+def plot_PCA_with_clusters(labels, season_numeric):
+    plot_columns = __get_PCA_with_clusters(season_numeric)
+    plt.figure(5)
+    plt.scatter(x=plot_columns[:,0], y=plot_columns[:,1], c=labels)
+    plt.xlabel('PC1', fontsize=15)
+    plt.xticks(fontsize=12)
+    plt.ylabel('PC2', fontsize=15)
+    plt.yticks(fontsize=12)
+    plt.title('Data plotted into Clusters', fontsize=16)
 
-# Split data into 80% training and 20% testing for the columns you want to use. 
-# The first column is the data you will be using to predict the value of the second column
-x_train, x_test, y_train, y_test = train_test_split(season_data[["FG"]], season_data[["AST"]], test_size=0.2, random_state=42)
+# TODO Needs to be changed for Spectral Clustering (if we plan on using this part of it at least)
+# def get_player_label(model, season_df, season_numeric, player_name):
+#     player = season_numeric.loc[season_df['Player'] == player_name,:]
+#     player_list = player.values.tolist()
+#     player_label = model.predict(player_list)
+#     return player_label
 
-linear_regression = LinearRegression()
-linear_regression.fit(x_train, y_train)
-predictions = linear_regression.predict(x_test)
+season_2010 = season_data(df, 2010)
+season_2010_numeric = season_numeric_data(season_2010)
+plot_Silh_Score(season_2010_numeric, 2, 11)
 
-lin_reg_confidence = linear_regression.score(x_test, y_test)
-print("Linear Regression confidence (R^2): ", lin_reg_confidence)
-print("Mean Squared Error: ", mean_squared_error(y_test, predictions))
+# 2 clusters doesn't really make sense, but 5 performs similarly so we'll use that
+spec = generate_spec_model(5)
+labels = get_labels(spec, season_2010_numeric)
+plot_PCA_with_clusters(labels, season_2010_numeric)
 
 plt.show()
