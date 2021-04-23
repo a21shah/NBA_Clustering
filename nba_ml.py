@@ -1,17 +1,21 @@
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+# Visualization
+from sklearn.manifold import TSNE
+import seaborn as sns # tSNE visualization
+from sklearn.decomposition import FastICA
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, KernelPCA
+# K-means
 from sklearn.cluster import KMeans
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-import seaborn as sns
 
-df = pd.read_csv('data/Seasons_Stats.csv')
-print(df.shape)
-
+#######################
+# CLEANING #
+#######################
 def filter_years(df):
     # Filter data so only seasons from 2010 onwards are included
     df = df[df['Year'].notna()]
@@ -37,57 +41,56 @@ def fill_empty_values(df):
     df.fillna(0, inplace=True)
     return df
 
+df = pd.read_csv('data/Seasons_Stats.csv')
 df = filter_years(df)
 df = cleaned_df(df)
 df = fill_empty_values(df)
-df.shape
 
 # Taking only first position listed when multiple are listed
 df['Pos'] = df['Pos'].str.split('-').str[0]
 
-# Visualize
+
+#######
+# PCA #
+#######
+
 features = [x for x in df.columns if (x != 'Player') &  (x != 'Pos')]
-print(df.shape)
 print(features)
 
-def df_PCA_yr(df, year):
+def plot_PCA(df, year):
     df_vis = df[df['Year'] == year]
     df_vis = df_vis.drop('Year', axis=1)
     features = [x for x in df_vis.columns if (x != 'Player') &  (x != 'Pos') & (x != 'Tm')]
     x = df_vis.loc[:, features].values
     y = df_vis.loc[:,['Pos']].values
     x = StandardScaler().fit_transform(x)
-    pca = PCA(n_components=2)
+    pca = PCA(n_components=2, random_state=0)
     principalComponents = pca.fit_transform(x)
     principalDf = pd.DataFrame(data = principalComponents, columns = ['pc1', 'pc2'])
     final = pd.concat([principalDf.reset_index(drop=True), df_vis['Pos'].reset_index(drop=True)], axis=1)
     print("Explained variance: ", pca.explained_variance_ratio_)
-    return final,pca,features
-
-def plot_PCA(df_PCA):
     fig = plt.figure(figsize = (8,8))
     ax = fig.add_subplot(1,1,1) 
     ax.set_xlabel('Principal Component 1', fontsize = 15)
     ax.set_ylabel('Principal Component 2', fontsize = 15)
     ax.set_title('2 component PCA', fontsize = 20)
 
-    targets = df_PCA.Pos.unique() # list of positions (PCA groups)
+    targets = final.Pos.unique() # list of positions (PCA groups)
     colors = ['r', 'g', 'b', 'm', 'c']
     for target, color in zip(targets,colors):
-        indicesToKeep = df_PCA['Pos'] == target
-        ax.scatter(df_PCA.loc[indicesToKeep, 'pc1']
-                , df_PCA.loc[indicesToKeep, 'pc2']
+        indicesToKeep = final['Pos'] == target
+        ax.scatter(final.loc[indicesToKeep, 'pc1']
+                , final.loc[indicesToKeep, 'pc2']
                 , c = color
                 , s = 50)
     ax.legend(targets)
     ax.grid()
-    return None
+    return final,pca,features
 
 def plot_featImport_PCA(pcaObj, features):
      # feature importance for first dimension
     fimp1 = pd.DataFrame(data={'feat':features,'imp':pcaObj.components_[0]})
     fimp1 = fimp1.reindex(fimp1.imp.abs().sort_values(ascending = False).index)
-    # print(fimp1)
     top_fimp1 = fimp1.nlargest(10,'imp')
     top_fimp1 = top_fimp1.iloc[::-1]
     top_fimp1 = top_fimp1.set_index("feat")
@@ -107,12 +110,28 @@ def plot_featImport_PCA(pcaObj, features):
     ax.set_ylabel('Feature', fontsize = 15)
     ax.set_title('PCA Component 2 Feature Importance', fontsize = 20)
 
+def feature_variance (df, year, percent):
+    df_var = df[df['Year'] == year]
+    df_var = df_var.drop('Year', axis=1)
+    features = [x for x in df_var.columns if (x != 'Player') &  (x != 'Pos') & (x != 'Tm')]
+    x = df_var.loc[:, features].values
+    y = df_var.loc[:,['Pos']].values
+    x = StandardScaler().fit_transform(x)
+    pca = PCA(n_components=percent)
+    principalComponents = pca.fit_transform(x)
+    perExplained = round(100*pca.explained_variance_ratio_.sum(), 2)
+    print("{}% of features explained by {} features".format(perExplained, principalComponents.shape[1]))
+    return principalComponents.shape[1] # num of features
 
-df_PCA, pca, features = df_PCA_yr(df, 2010)
-plot_PCA(df_PCA)
+
+df_PCA, pca, features = plot_PCA(df, 2010)
 plot_featImport_PCA(pca, features)
+feature_variance(df, 2010, 0.99)
 
-# K-Means Clustering
+
+######################
+# K-Means Clustering #
+######################
 # Note: You may need to re-run the second block of code (reading the .csv) AND the data cleaning block before running everything after this point.
 
 year = 2010
