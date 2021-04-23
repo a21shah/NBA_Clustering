@@ -11,7 +11,7 @@ from sklearn.decomposition import PCA, KernelPCA
 from sklearn.cluster import KMeans
 
 #######################
-# FUNCTION DEFINITION #
+# CLEANING #
 #######################
 def filter_years(df):
     # Filter data so only seasons from 2010 onwards are included
