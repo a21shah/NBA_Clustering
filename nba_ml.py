@@ -41,6 +41,11 @@ def fill_empty_values(df):
     df.fillna(0, inplace=True)
     return df
 
+def season_data(df, year):
+    season_data = df[df['Year'] == year]
+    season_data = season_data.drop('Year', axis=1)
+    return season_data
+
 df = pd.read_csv('data/Seasons_Stats.csv')
 df = filter_years(df)
 df = cleaned_df(df)
@@ -132,15 +137,87 @@ feature_variance(df, 2010, 0.99)
 # K-Means Clustering #
 ######################
 
+def plot_pairwise_scatter(dataframe, columns):
+    plt.figure(4)
+    sns.pairplot(dataframe[[columns[0], columns[1], columns[2]]])
+    plt.show()
+    return
+    
+def plot_correlation_heatmap(dataframe, columns):
+    plt.figure(5)
+    correlation = dataframe[[columns[0], columns[1], columns[2]]].corr()
+    sns.heatmap(correlation, annot=True)
+    plt.show()
+    return
+    
+def get_numeric_data_only(dataframe):
+    return dataframe._get_numeric_data().dropna(axis=1)
+
+def get_PCA_with_clusters(dataframe):
+    columns_with_numeric_data = get_numeric_data_only(dataframe)
+    nba_pca = PCA(2) #put data into 2 dimensions
+    return nba_pca.fit_transform(columns_with_numeric_data)
+    
+def plot_PCA_with_kmeans_clusters(dataframe, data_labels, model):
+    plot_columns = get_PCA_with_clusters(dataframe)   
+    pred_y = model.fit_predict(plot_columns)
+    plt.figure(6)
+    plt.scatter(x=plot_columns[:,0], y=plot_columns[:,1], c=model.labels_)
+    plt.scatter(model.cluster_centers_[:,0], model.cluster_centers_[:,1],
+           s=30, c='red')
+    plt.show()
+    return
+    
+def generate_kmeans_model(dataframe, k):
+    model = KMeans(n_clusters=k, init='k-means++', max_iter=1000, n_init=10, random_state=0)
+    columns_with_numeric_data = get_numeric_data_only(dataframe)
+    model.fit(columns_with_numeric_data)
+    return model
+    
+def get_kmeans_cluster_labels(kmeans_model):
+    return kmeans_model.labels_
+
+def get_player_label(dataframe, player_name, model):
+    columns_with_numeric_data = get_numeric_data_only(dataframe)
+    player = columns_with_numeric_data.loc[season_data['Player'] == player_name,:]
+    player_list = player.values.tolist()
+    player_label = model.predict(player_list)
+    return player_label
+
+season_2010 = season_data(df, 2010)
+season_2010.mean()
+
+columns = ["AST", "FG", "TRB"]
+plot_pairwise_scatter(season_2010, columns)
+plot_correlation_heatmap(season_2010, columns)
+
+kmeans_model = generate_kmeans_model(season_2010, 4)
+labels = get_kmeans_cluster_labels(kmeans_model)
+plot_PCA_with_kmeans_clusters(season_2010, labels, kmeans_model)
+print('yoooo')
+wcss = []
+
+for i in range(1, 11):
+    k_means = KMeans(n_clusters=i, init='k-means++', max_iter=300,
+                    n_init=10, random_state=0)
+    #plot_columns = get_PCA_with_clusters(season_data)   
+    #pred_y = model.fit_predict(plot_columns)
+    #k_means.fit_predict(plot_columns)
+    k_means.fit(get_numeric_data_only(season_2010))
+    wcss.append(k_means.inertia_)
+
+plt.figure(7)
+plt.plot(range(1,11), wcss)
+plt.title('Elbow Method')
+plt.xlabel('Number of clusters')
+plt.ylabel('WCSS')
+plt.show()
+
+print('what up')
 
 #######################
 # Spectral Clustering #
 #######################
-
-def season_data(df, year):
-    season_data = df[df['Year'] == year]
-    season_data = season_data.drop('Year', axis=1)
-    return season_data
 
 def season_numeric_data(season_df):
     return season_df._get_numeric_data().dropna(axis=1)
@@ -166,7 +243,7 @@ def plot_Silh_Score(season_numeric, min_cluster, max_cluster):
         silhouette_scores.append(silhouette_avg)
         # print("For n_clusters =", i, "The average silhouette_score is:", silhouette_avg)
     n_clusters = list(range(min_cluster, max_cluster))
-    plt.figure(4)
+    plt.figure(8)
     plt.plot(n_clusters, silhouette_scores, '-o')
     plt.grid()
     plt.xlabel('Number of Clusters', fontsize=15)
@@ -177,7 +254,7 @@ def plot_Silh_Score(season_numeric, min_cluster, max_cluster):
 
 def plot_PCA_with_clusters(labels, season_numeric):
     plot_columns = __get_PCA_with_clusters(season_numeric)
-    plt.figure(5)
+    plt.figure(9)
     plt.scatter(x=plot_columns[:,0], y=plot_columns[:,1], c=labels)
     plt.xlabel('PC1', fontsize=15)
     plt.xticks(fontsize=12)
