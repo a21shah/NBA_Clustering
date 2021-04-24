@@ -161,6 +161,7 @@ def plot_PCA_with_kmeans_clusters(dataframe, data_labels, model):
     plt.figure(6)
     plt.scatter(x=plot_columns[:,0], y=plot_columns[:,1], c=model.labels_)
     plt.scatter(model.cluster_centers_[:,0], model.cluster_centers_[:,1],s=30, c='red')
+    plt.title('K-Means Clusters', fontsize=16)
     
 def generate_kmeans_model(dataframe, k):
     model = KMeans(n_clusters=k, init='k-means++', max_iter=1000, n_init=10, random_state=0)
@@ -177,6 +178,28 @@ def get_player_label(dataframe, player_name, model):
     player_list = player.values.tolist()
     player_label = model.predict(player_list)
     return player_label
+
+def plot_kmeans_Silh_Score(season_numeric, min_cluster, max_cluster):
+    silhouette_scores = []
+    for i in range(min_cluster, max_cluster):
+       # k_means = KMeans(n_clusters=i, init='k-means++', max_iter=300,
+       #             n_init=10, random_state=10)
+        k_means = generate_kmeans_model(season_2010, i)
+        #k_means.fit(get_numeric_data_only(season_2010))
+        labels = get_kmeans_cluster_labels(k_means)
+        silhouette_avg = silhouette_score(season_numeric, labels)
+        silhouette_scores.append(silhouette_avg)
+        #print("For n_clusters =", i, "The average silhouette_score is:", silhouette_avg)
+    n_clusters = list(range(min_cluster, max_cluster))
+    plt.figure(7)
+    plt.plot(n_clusters, silhouette_scores, '-o')
+    plt.grid()
+    plt.xlabel('Number of Clusters', fontsize=15)
+    plt.xticks(fontsize=12)
+    plt.ylabel('Score', fontsize=15)
+    plt.yticks(fontsize=12)
+    plt.title('K-Means Silhouette Scores ', fontsize=16)
+
 
 season_2010 = season_data(df, 2010)
 season_2010.mean()
@@ -199,11 +222,31 @@ for i in range(1, 11):
     k_means.fit(get_numeric_data_only(season_2010))
     wcss.append(k_means.inertia_)
 
-plt.figure(7)
+plt.figure(8)
 plt.plot(range(1,11), wcss)
 plt.title('Elbow Method')
 plt.xlabel('Number of clusters')
 plt.ylabel('WCSS')
+
+plot_kmeans_Silh_Score(get_numeric_data_only(season_2010), 2, 11)
+
+
+# for i in range(1,11):
+#     k_means = KMeans(n_clusters=i, init='k-means++', max_iter=300,
+#                     n_init=10, random_state=10)
+#     cluster_labels = k_means.fit_predict(get_numeric_data_only(season_2010))
+#     silhouette_avg = silhouette_score(get_numeric_data_only(season_2010), cluster_labels)
+#     sample_silhouette_values = silhouette_samples(get_numeric_data_only(season_2010), cluster_labels)
+
+#     for j in range(i):
+#         ith_cluster_silhouette_values = \
+#             sample_silhouette_values[cluster_labels == i]
+        
+#         ith_cluster_silhouette_values.sort()
+
+#         size_cluster_i = ith_cluster_silhouette_values.shape[0]
+#         y_upper = y_lower + size_cluster_i
+
 
 #######################
 # Spectral Clustering #
@@ -233,7 +276,7 @@ def plot_Silh_Score(season_numeric, min_cluster, max_cluster):
         silhouette_scores.append(silhouette_avg)
         # print("For n_clusters =", i, "The average silhouette_score is:", silhouette_avg)
     n_clusters = list(range(min_cluster, max_cluster))
-    plt.figure(8)
+    plt.figure(9)
     plt.plot(n_clusters, silhouette_scores, '-o')
     plt.grid()
     plt.xlabel('Number of Clusters', fontsize=15)
@@ -244,7 +287,7 @@ def plot_Silh_Score(season_numeric, min_cluster, max_cluster):
 
 def plot_PCA_with_clusters(labels, season_numeric):
     plot_columns = __get_PCA_with_clusters(season_numeric)
-    plt.figure(9)
+    plt.figure(10)
     plt.scatter(x=plot_columns[:,0], y=plot_columns[:,1], c=labels)
     plt.xlabel('PC1', fontsize=15)
     plt.xticks(fontsize=12)
