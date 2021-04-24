@@ -138,16 +138,13 @@ feature_variance(df, 2010, 0.99)
 ######################
 
 def plot_pairwise_scatter(dataframe, columns):
-    plt.figure(4)
     sns.pairplot(dataframe[[columns[0], columns[1], columns[2]]])
-    plt.show()
     return
     
 def plot_correlation_heatmap(dataframe, columns):
     plt.figure(5)
     correlation = dataframe[[columns[0], columns[1], columns[2]]].corr()
     sns.heatmap(correlation, annot=True)
-    plt.show()
     return
     
 def get_numeric_data_only(dataframe):
@@ -163,10 +160,7 @@ def plot_PCA_with_kmeans_clusters(dataframe, data_labels, model):
     pred_y = model.fit_predict(plot_columns)
     plt.figure(6)
     plt.scatter(x=plot_columns[:,0], y=plot_columns[:,1], c=model.labels_)
-    plt.scatter(model.cluster_centers_[:,0], model.cluster_centers_[:,1],
-           s=30, c='red')
-    plt.show()
-    return
+    plt.scatter(model.cluster_centers_[:,0], model.cluster_centers_[:,1],s=30, c='red')
     
 def generate_kmeans_model(dataframe, k):
     model = KMeans(n_clusters=k, init='k-means++', max_iter=1000, n_init=10, random_state=0)
@@ -179,7 +173,7 @@ def get_kmeans_cluster_labels(kmeans_model):
 
 def get_player_label(dataframe, player_name, model):
     columns_with_numeric_data = get_numeric_data_only(dataframe)
-    player = columns_with_numeric_data.loc[season_data['Player'] == player_name,:]
+    player = columns_with_numeric_data.loc[dataframe['Player'] == player_name,:]
     player_list = player.values.tolist()
     player_label = model.predict(player_list)
     return player_label
@@ -194,7 +188,6 @@ plot_correlation_heatmap(season_2010, columns)
 kmeans_model = generate_kmeans_model(season_2010, 4)
 labels = get_kmeans_cluster_labels(kmeans_model)
 plot_PCA_with_kmeans_clusters(season_2010, labels, kmeans_model)
-print('yoooo')
 wcss = []
 
 for i in range(1, 11):
@@ -211,9 +204,6 @@ plt.plot(range(1,11), wcss)
 plt.title('Elbow Method')
 plt.xlabel('Number of clusters')
 plt.ylabel('WCSS')
-plt.show()
-
-print('what up')
 
 #######################
 # Spectral Clustering #
